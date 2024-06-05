@@ -72,7 +72,7 @@ jobs:
               core.setOutput('pull_number', pullRequests[0].number);
             } else {
               throw new Error('No open pull request found.');
-                
+
       - name: Merge Pull Request
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         uses: actions/github-script@v4
