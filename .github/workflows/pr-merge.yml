@@ -67,8 +67,7 @@ jobs:
           fi
           echo "::set-output name=pull_number::$PULL_NUMBER"
 
-      - name: Debug PR Number
-        run: echo "Pull Request Number: ${{ steps.get-pull-request.outputs.pull_number }}"
+
 
       - name: Merge Pull Request
         env:
