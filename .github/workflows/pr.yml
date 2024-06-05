@@ -56,27 +56,38 @@ jobs:
           git config --global user.email "${GIT_USER_EMAIL}"
           git config --global user.name "${GIT_USER_NAME}"
 
-      - name: Merge Pull Request
-        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-        uses: octokit/request-action@v2
-        with:
-          route: POST /repos/:repository_owner/:repository_name/pulls/:pull_number/merge
-          repository_owner: ${{ github.repository_owner }}
-          repository_name: ${{ github.event.repository.name }}
-          pull_number: ${{ steps.get-pull-request.outputs.pull_number }}
-          merge_method: merge
-          commit_title: 'Automated merge of develop into stage [skip ci]'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Get Pull Request Number
         id: get-pull-request
-        uses: octokit/request-action@v2
+        uses: actions/github-script@v4
         with:
-          route: GET /repos/:repository_owner/:repository_name/pulls
-          repository_owner: ${{ github.repository_owner }}
-          repository_name: ${{ github.event.repository.name }}
-          head: develop
-          state: open
+          script: |
+            const { data: pullRequests } = await github.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: 'develop',
+              base: 'stage'
+            });
+            if (pullRequests.length > 0) {
+              core.setOutput('pull_number', pullRequests[0].number);
+            } else {
+              throw new Error('No open pull request found.');
+            }
+
+      - name: Merge Pull Request
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        uses: actions/github-script@v4
+        with:
+          script: |
+            const pull_number = core.getInput('pull_number');
+            await github.pulls.merge({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pull_number,
+              commit_title: 'Automated merge of develop into stage [skip ci]',
+              merge_method: 'merge'
+            });
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          pull_number: ${{ steps.get-pull-request.outputs.pull_number }}
