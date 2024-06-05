@@ -5,8 +5,8 @@ on:
     branches:
       - develop
   schedule:
-    - cron: '30 6 * * 3'  # Scheduled to run at 6:30 AM UTC every Wednesday
-  workflow_dispatch:  # Allows manual triggering
+    - cron: '30 6 * * 3'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -22,7 +22,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
         with:
-          fetch-depth: 0  # Ensures the entire git history is checked out
+          fetch-depth: 0
 
       - name: Configure Git
         run: |
@@ -35,8 +35,8 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: 'Automate merging develop into stage'
-          branch: develop  # This is the source branch for PR
-          base: stage  # The target branch for PR
+          branch: develop
+          base: stage
           title: 'Merge Develop into Stage'
           body: 'Automated pull request to merge changes from develop into stage.'
           labels: 'automerge'
@@ -58,7 +58,7 @@ jobs:
           pr_number=${{ needs.create-pull-request.outputs.pr_number }}
           if [ -z "$pr_number" ] || [ "$pr_number" == "null" ]; then
             echo "No pull request was created or found."
-            exit 0  # Exit gracefully without error
+            exit 0
           else
-            gh pr review $pr_number --approve --body 'Auto-approve'
+            gh pr review --approve --pr $pr_number
             gh pr merge $pr_number --merge --body 'Automated merge completed'
