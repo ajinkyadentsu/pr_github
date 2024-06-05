@@ -64,7 +64,8 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'open',
-              head: 'develop'
+              head: 'develop',
+              base: 'stage'
             });
             if (pullRequests.length > 0) {
               core.setOutput('pull_number', pullRequests[0].number);
