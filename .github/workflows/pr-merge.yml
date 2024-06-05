@@ -5,7 +5,7 @@ on:
     branches:
       - develop
   schedule:
-    - cron: '30 6 * * 3'  # Runs at 06:30 UTC every Wednesday
+    - cron: '30 6 * * 3'
   workflow_dispatch:
 
 jobs:
@@ -25,12 +25,18 @@ jobs:
 
       - name: Create Pull Request
         id: create-pr
-        run: |
-          gh auth login --with-token <<<"${{ secrets.GITHUB_TOKEN }}"
-          PR_URL=$(gh pr create --base stage --head develop --title "Merge develop into stage" --body "This is an automated pull request to merge changes from develop into stage.")
-          echo "Pull Request URL: $PR_URL"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: peter-evans/create-pull-request@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'Merge develop into stage [skip ci]'
+          base: stage
+          head: develop
+          title: 'Merge develop into stage'
+          body: 'This is an automated pull request to merge changes from develop into stage.'
+          labels: 'automerge'
+
+      - name: Debug PR Creation
+        run: echo "Pull Request URL: ${{ steps.create-pr.outputs.pull-request-url }}"
 
   merge-pull-request:
     runs-on: ubuntu-latest
@@ -50,21 +56,31 @@ jobs:
 
       - name: Get Pull Request Number
         id: get-pull-request
-        run: |
-          gh auth login --with-token <<<"${{ secrets.GITHUB_TOKEN }}"
-          PULL_REQUEST_NUMBER=$(gh pr list --state open --base stage --head develop --json number --jq '.[0].number')
-          if [ -z "$PULL_REQUEST_NUMBER" ]; then
-            echo "No open pull request found."
-            exit 1
-          fi
-          echo "::set-output name=pull_number::$PULL_REQUEST_NUMBER"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: actions/github-script@v4
+        with:
+          script: |
+            const { data: pullRequests } = await github.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: 'develop'
+            });
+            if (pullRequests.length > 0) {
+              core.setOutput('pull_number', pullRequests[0].number);
+            } else {
+              throw new Error('No open pull request found.');
 
       - name: Merge Pull Request
-        run: |
-          gh auth login --with-token <<<"${{ secrets.GITHUB_TOKEN }}"
-          PULL_REQUEST_NUMBER=${{ steps.get-pull-request.outputs.pull_number }}
-          gh pr merge $PULL_REQUEST_NUMBER --merge --delete-branch --subject "Automated merge of develop into stage [skip ci]"
+        uses: actions/github-script@v4
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          script: |
+            const pull_number = core.getInput('pull_number');
+            await github.pulls.merge({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pull_number,
+              commit_title: 'Automated merge of develop into stage [skip ci]',
+              merge_method: 'merge'
+            });
