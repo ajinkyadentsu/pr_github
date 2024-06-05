@@ -72,11 +72,12 @@ jobs:
               core.setOutput('pull_number', pullRequests[0].number);
             } else {
               throw new Error('No open pull request found.');
-            }
 
       - name: Merge Pull Request
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         uses: actions/github-script@v4
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           script: |
             const pull_number = core.getInput('pull_number');
@@ -87,7 +88,3 @@ jobs:
               commit_title: 'Automated merge of develop into stage [skip ci]',
               merge_method: 'merge'
             });
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          pull_number: ${{ steps.get-pull-request.outputs.pull_number }}
