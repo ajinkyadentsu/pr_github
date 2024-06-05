@@ -58,34 +58,25 @@ jobs:
 
       - name: Merge Pull Request
         if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-        uses: actions/github-script@v4
+        uses: octokit/request-action@v2
         with:
-          script: |
-            const { Octokit } = require("@octokit/rest");
-            const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
+          route: POST /repos/:repository_owner/:repository_name/pulls/:pull_number/merge
+          repository_owner: ${{ github.repository_owner }}
+          repository_name: ${{ github.event.repository.name }}
+          pull_number: ${{ steps.get-pull-request.outputs.pull_number }}
+          merge_method: merge
+          commit_title: 'Automated merge of develop into stage [skip ci]'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-            // Find the pull request to merge
-            const { data: pullRequests } = await octokit.pulls.list({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              head: 'develop',
-              base: 'stage',
-            });
-
-            if (pullRequests.length > 0) {
-              const pullRequest = pullRequests[0];
-
-              // Merge the pull request
-              await octokit.pulls.merge({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: pullRequest.number,
-                commit_title: 'Automated merge of develop into stage [skip ci]',
-                merge_method: 'merge'
-              });
-            } else {
-              console.log('No open pull request found to merge.');
-            }
+      - name: Get Pull Request Number
+        id: get-pull-request
+        uses: octokit/request-action@v2
+        with:
+          route: GET /repos/:repository_owner/:repository_name/pulls
+          repository_owner: ${{ github.repository_owner }}
+          repository_name: ${{ github.event.repository.name }}
+          head: develop
+          state: open
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
