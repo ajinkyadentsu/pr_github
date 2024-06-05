@@ -25,12 +25,12 @@ jobs:
 
       - name: Create Pull Request
         id: create-pr
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
-          PR_URL=$(gh pr create --base stage --head develop --title "Merge develop into stage" --body "This is an automated pull request to merge changes from develop into stage.")
-          echo "Pull Request URL: $PR_URL"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh auth setup-git
+          PR_URL=$(gh pr create --base stage --head develop --title "Merge develop into stage" --body "This is an automated pull request to merge changes from develop into stage.")
+          echo "Pull Request URL: $PR_URL"
 
   merge-pull-request:
     runs-on: ubuntu-latest
@@ -50,21 +50,21 @@ jobs:
 
       - name: Get Pull Request Number
         id: get-pull-request
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+          gh auth setup-git
           PULL_REQUEST_NUMBER=$(gh pr list --state open --base stage --head develop --json number --jq '.[0].number')
           if [ -z "$PULL_REQUEST_NUMBER" ]; then
             echo "No open pull request found."
             exit 1
           fi
           echo "::set-output name=pull_number::$PULL_REQUEST_NUMBER"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Merge Pull Request
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
-          PULL_REQUEST_NUMBER=${{ steps.get-pull-request.outputs.pull_number }}
-          gh pr merge $PULL_REQUEST_NUMBER --merge --delete-branch --subject "Automated merge of develop into stage [skip ci]"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh auth setup-git
+          PULL_REQUEST_NUMBER=${{ steps.get-pull-request.outputs.pull_number }}
+          gh pr merge $PULL_REQUEST_NUMBER --merge --delete-branch --subject "Automated merge of develop into stage [skip ci]"
