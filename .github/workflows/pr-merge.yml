@@ -62,20 +62,19 @@ jobs:
         run: |
           PULL_NUMBER=$(gh pr list --repo "${{ github.repository }}" --state open --base stage --head "${{ github.repository }}:develop" --json number --jq '.[0].number')
           if [ -z "$PULL_NUMBER" ]; then
-            echo "No open pull request found."
-            exit 1
+            echo "No open pull request found. Exiting without error."
+            echo "pull_number=0" >> $GITHUB_ENV
+            exit 0
           fi
+          echo "pull_number=$PULL_NUMBER" >> $GITHUB_ENV
           echo "::set-output name=pull_number::$PULL_NUMBER"
 
-
+      - name: Debug PR Number
+        run: echo "Pull Request Number: ${{ steps.get-pull-request.outputs.pull_number }}"
 
       - name: Merge Pull Request
+        if: env.pull_number != 0
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          PULL_NUMBER=${{ steps.get-pull-request.outputs.pull_number }}
-          if [ -z "$PULL_NUMBER" ]; then
-            echo "No pull request number found."
-            exit 1
-          fi
-          gh pr merge $PULL_NUMBER --repo "${{ github.repository }}" --merge --body 'Automated merge of develop into stage [skip ci]'
+          gh pr merge ${{ env.pull_number }} --repo "${{ github.repository }}" --merge --body 'Automated merge of develop into stage [skip ci]'
