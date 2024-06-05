@@ -35,8 +35,8 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: 'Automate merging develop into stage'
-          branch: 'develop'
-          base: 'stage'
+          branch: develop  # This is the source branch
+          base: stage  # This is the target branch
           title: 'Merge Develop into Stage'
           body: 'Automated pull request to merge changes from develop into stage.'
           labels: 'automerge'
@@ -56,5 +56,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           pr_number=${{ needs.create-pull-request.outputs.pr_number }}
-          gh pr review $pr_number --approve
-          gh pr merge $pr_number --merge --body 'Automated merge completed'
+          if [ -z "$pr_number" ] || [ "$pr_number" == "null" ]; then
+            echo "No pull request was created or found."
+            exit 0  # Exit gracefully without an error
+          else
+            gh pr review $pr_number --approve
+            gh pr merge $pr_number --merge --body 'Automated merge completed'
