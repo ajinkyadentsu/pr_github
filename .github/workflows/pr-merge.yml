@@ -5,8 +5,8 @@ on:
     branches:
       - develop
   schedule:
-    - cron: '30 6 * * 3'
-  workflow_dispatch:
+    - cron: '30 6 * * 3'  # Example: At 6:30 AM UTC every Wednesday
+  workflow_dispatch:  # Allows manual triggering
 
 permissions:
   contents: write
@@ -15,6 +15,8 @@ permissions:
 jobs:
   create-pull-request:
     runs-on: ubuntu-latest
+    outputs:
+      pr_number: ${{ steps.create_pr.outputs.pr_number }}
 
     steps:
       - name: Checkout repository
@@ -24,59 +26,35 @@ jobs:
 
       - name: Configure Git
         run: |
-          git config --global user.email "${{ secrets.GIT_USER_EMAIL }}"
-          git config --global user.name "${{ secrets.GIT_USER_NAME }}"
+          git config user.email "${{ secrets.GIT_USER_EMAIL }}"
+          git config user.name "${{ secrets.GIT_USER_NAME }}"
 
       - name: Create Pull Request
-        if: github.event_name == 'push'
+        id: create_pr
         uses: peter-evans/create-pull-request@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: 'Merge develop into stage [skip ci]'
-          base: stage
-          head: develop
-          title: 'Merge develop into stage'
-          body: 'This is an automated pull request to merge changes from develop into stage.'
+          commit-message: 'Automate merging develop into stage'
+          branch: 'develop'
+          base: 'stage'
+          title: 'Merge Develop into Stage'
+          body: 'Automated pull request to merge changes from develop into stage.'
           labels: 'automerge'
 
-  merge-pull-request:
-    runs-on: ubuntu-latest
+  auto-merge:
     needs: create-pull-request
+    runs-on: ubuntu-latest
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
 
-      - name: Configure Git
-        run: |
-          git config --global user.email "${{ secrets.GIT_USER_EMAIL }}"
-          git config --global user.name "${{ secrets.GIT_USER_NAME }}"
-
-      - name: Get Pull Request Number
-        id: get-pull-request
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          PULL_NUMBER=$(gh pr list --repo "${{ github.repository }}" --state open --base stage --head "${{ github.repository }}:develop" --json number --jq '.[0].number')
-          if [ -z "$PULL_NUMBER" ]; then
-            echo "No open pull request found."
-            echo "PULL_NUMBER_FOUND=0" >> $GITHUB_ENV
-            exit 0
-          else
-            echo "PULL_NUMBER_FOUND=1" >> $GITHUB_ENV
-            echo "PULL_NUMBER=$PULL_NUMBER" >> $GITHUB_ENV
-          fi
-
-      - name: Debug PR Number
-        if: env.PULL_NUMBER_FOUND == '1'
-        run: echo "Pull Request Number: ${{ env.PULL_NUMBER }}"
-
       - name: Merge Pull Request
-        if: env.PULL_NUMBER_FOUND == '1'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh pr merge ${{ env.PULL_NUMBER }} --repo "${{ github.repository }}" --merge --body 'Automated merge of develop into stage [skip ci]'
+          pr_number=${{ needs.create-pull-request.outputs.pr_number }}
+          gh pr review --repo ${{ github.repository }} --approve --pull-request $pr_number
+          gh pr merge --repo ${{ github.repository }} --pull-request $pr_number --merge --body 'Automated merge completed'
