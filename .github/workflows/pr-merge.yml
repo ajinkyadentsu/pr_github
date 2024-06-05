@@ -42,6 +42,7 @@ jobs:
   merge-pull-request:
     runs-on: ubuntu-latest
     needs: create-pull-request
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
 
     steps:
       - name: Checkout repository
@@ -59,7 +60,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          PULL_NUMBER=$(gh pr list --repo "${{ github.repository }}" --state open --head develop --json number --jq '.[0].number')
+          PULL_NUMBER=$(gh pr list --repo "${{ github.repository }}" --state open --base stage --head "${{ github.repository }}:develop" --json number --jq '.[0].number')
           if [ -z "$PULL_NUMBER" ]; then
             echo "No open pull request found."
             exit 1
@@ -70,7 +71,6 @@ jobs:
         run: echo "Pull Request Number: ${{ steps.get-pull-request.outputs.pull_number }}"
 
       - name: Merge Pull Request
-        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
