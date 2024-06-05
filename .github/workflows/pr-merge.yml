@@ -28,19 +28,18 @@ jobs:
           git config --global user.name "${{ secrets.GIT_USER_NAME }}"
 
       - name: Create Pull Request
-        id: create-pr
-        uses: peter-evans/create-pull-request@v3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: 'Merge develop into stage [skip ci]'
-          base: stage
-          head: develop
-          title: 'Merge develop into stage'
-          body: 'This is an automated pull request to merge changes from develop into stage.'
-          labels: 'automerge'
+        run: |
+          BASE_BRANCH="stage"
+          HEAD_BRANCH="develop"
+          PR_TITLE="Merge $HEAD_BRANCH into $BASE_BRANCH"
+          PR_BODY="This is an automated pull request to merge changes from $HEAD_BRANCH into $BASE_BRANCH."
+          PR_LABEL="automerge"
+
+          gh pr create --base "$BASE_BRANCH" --head "$HEAD_BRANCH" --title "$PR_TITLE" --body "$PR_BODY" --label "$PR_LABEL"
 
       - name: Debug PR Creation
-        run: echo "Pull Request URL: ${{ steps.create-pr.outputs.pull-request-url }}"
+        run: |
+          echo "Pull Request created."
 
   merge-pull-request:
     runs-on: ubuntu-latest
@@ -60,31 +59,15 @@ jobs:
 
       - name: Get Pull Request Number
         id: get-pull-request
-        uses: actions/github-script@v4
-        with:
-          script: |
-            const { data: pullRequests } = await github.pulls.list({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              head: 'develop'
-            });
-            if (pullRequests.length > 0) {
-              core.setOutput('pull_number', pullRequests[0].number);
-            } else {
-              throw new Error('No open pull request found.');
+        run: |
+          PR_NUMBER=$(gh pr list --base stage --head develop --state open --json number --jq '.[0].number')
+          echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
 
       - name: Merge Pull Request
-        uses: actions/github-script@v4
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          script: |
-            const pull_number = core.getInput('pull_number');
-            await github.pulls.merge({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: pull_number,
-              commit_title: 'Automated merge of develop into stage [skip ci]',
-              merge_method: 'merge'
-            });
+        run: |
+          PR_NUMBER=${{ env.PR_NUMBER }}
+          if [ -z "$PR_NUMBER" ]; then
+            echo "No open pull request found."
+            exit 1
+          fi
+          gh pr merge "$PR_NUMBER" --merge --body "Automated merge of develop into stage [skip ci]"
