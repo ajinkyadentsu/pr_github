@@ -29,6 +29,15 @@ jobs:
           git config user.email "${{ secrets.GIT_USER_EMAIL }}"
           git config user.name "${{ secrets.GIT_USER_NAME }}"
 
+      - name: Check Branch Status
+        run: |
+          git fetch origin
+          git checkout develop
+          echo "Status of develop branch:"
+          git status
+          git log -1
+          git diff origin/stage
+
       - name: Create Pull Request
         id: create_pr
         uses: peter-evans/create-pull-request@v3
