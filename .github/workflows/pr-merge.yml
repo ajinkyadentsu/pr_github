@@ -50,6 +50,9 @@ jobs:
           body: 'Automated pull request to merge changes from develop into stage.'
           labels: 'automerge'
 
+      - name: Output PR Number
+        run: echo "PR Number: ${{ steps.create_pr.outputs.pull-request-number }}"
+
   auto-merge:
     runs-on: ubuntu-latest
     needs: create-pull-request
